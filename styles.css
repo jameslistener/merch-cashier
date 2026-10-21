@@ -163,6 +163,13 @@ html, body {
   justify-content: center;
   font-size: 64px;
   background: var(--surface2);
+  overflow: hidden;
+}
+
+.product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .product-info {
@@ -205,9 +212,26 @@ html, body {
   padding: 12px;
 }
 
-.cart-item-emoji {
-  font-size: 36px;
+.cart-item-thumb {
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+
+.cart-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cart-item-emoji-fallback {
+  font-size: 36px;
 }
 
 .cart-item-info {
@@ -607,9 +631,26 @@ html, body {
   padding: 14px;
 }
 
-.stock-item-emoji {
-  font-size: 32px;
+.stock-item-thumb {
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+
+.stock-item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stock-item-emoji-fallback {
+  font-size: 32px;
 }
 
 .stock-item-info {
@@ -768,9 +809,24 @@ html, body {
 
 /* Product detail in modal */
 .modal-product-img {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 80px;
   text-align: center;
-  margin-bottom: 16px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface2);
+}
+
+.modal-product-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .modal-product-name {

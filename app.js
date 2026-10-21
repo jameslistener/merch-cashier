@@ -74,37 +74,45 @@ function filterCategory(categoryId) {
   renderProducts();
 }
 
+function productImg(product, className = 'product-img') {
+  if (product.image) {
+    return `<div class="${className}"><img src="${product.image}" alt="${product.name}" loading="lazy"></div>`;
+  }
+  return `<div class="${className}">📦</div>`;
+}
+
 function renderProducts() {
   const container = document.getElementById('products-grid');
   const stock = DB.getStock();
-  
+
   let products = PRODUCTS;
   if (currentCategory !== 'all') {
     products = products.filter(p => p.categoryId === currentCategory);
   }
-  
+
   if (products.length === 0) {
     container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-dim);">Нет товаров</div>';
     return;
   }
-  
+
   let html = '';
   products.forEach(product => {
     const qty = stock[product.id] || 0;
     const outOfStock = qty === 0;
-    
+    const priceText = product.price === 0 ? 'Бесплатно' : formatPrice(product.price);
+
     html += `
       <div class="product-card ${outOfStock ? 'out-of-stock' : ''}" onclick="showProductDetail(${product.id})">
-        <div class="product-img">${product.emoji}</div>
+        ${productImg(product)}
         <div class="product-info">
           <div class="product-name">${product.name}</div>
-          <div class="product-price">${formatPrice(product.price)}</div>
+          <div class="product-price">${priceText}</div>
           <div class="product-stock">${outOfStock ? 'Нет в наличии' : `В наличии: ${qty}`}</div>
         </div>
       </div>
     `;
   });
-  
+
   container.innerHTML = html;
 }
 
@@ -114,16 +122,17 @@ function renderProducts() {
 function showProductDetail(productId) {
   const product = PRODUCTS.find(p => p.id === productId);
   if (!product) return;
-  
+
   const stock = DB.getStock();
   const qty = stock[productId] || 0;
-  
+  const priceText = product.price === 0 ? 'Бесплатно' : formatPrice(product.price);
+
   const content = `
-    <div class="modal-product-img">${product.emoji}</div>
+    ${productImg(product, 'modal-product-img')}
     <div class="modal-product-name">${product.name}</div>
-    <div class="modal-product-price">${formatPrice(product.price)}</div>
+    <div class="modal-product-price">${priceText}</div>
     <div class="modal-product-stock">В наличии: ${qty} шт.</div>
-    
+
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="addToCartFromModal(${productId})" ${qty === 0 ? 'disabled' : ''}>
         В корзину
@@ -133,7 +142,7 @@ function showProductDetail(productId) {
       </button>
     </div>
   `;
-  
+
   openModal(content);
 }
 
@@ -227,9 +236,12 @@ function renderCart() {
   let itemsHtml = '';
   cartItems.forEach(({ product, qty }) => {
     const itemTotal = product.price * qty;
+    const imgHtml = product.image
+      ? `<img src="${product.image}" alt="${product.name}" class="cart-item-img">`
+      : `<span class="cart-item-emoji-fallback">📦</span>`;
     itemsHtml += `
       <div class="cart-item">
-        <div class="cart-item-emoji">${product.emoji}</div>
+        <div class="cart-item-thumb">${imgHtml}</div>
         <div class="cart-item-info">
           <div class="cart-item-name">${product.name}</div>
           <div class="cart-item-price">${formatPrice(product.price)} × ${qty}</div>
@@ -467,10 +479,13 @@ function renderStock() {
   products.forEach(product => {
     const qty = stock[product.id] || 0;
     const qtyClass = qty === 0 ? 'zero' : qty < 5 ? 'low' : '';
-    
+    const imgHtml = product.image
+      ? `<img src="${product.image}" alt="${product.name}" class="stock-item-img">`
+      : `<span class="stock-item-emoji-fallback">📦</span>`;
+
     html += `
       <div class="stock-item">
-        <div class="stock-item-emoji">${product.emoji}</div>
+        <div class="stock-item-thumb">${imgHtml}</div>
         <div class="stock-item-info">
           <div class="stock-item-name">${product.name}</div>
           <div class="stock-item-price">${formatPrice(product.price)}</div>
