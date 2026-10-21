@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (если вдруг)
+node_modules/
+npm-debug.log
+
+# LocalStorage backup
+*.json.bak

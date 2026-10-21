@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Касса">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="styles.css">
+  <title>Касса Мерч</title>
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1 id="page-title">Каталог</h1>
+      <div id="cart-badge" class="hidden" onclick="switchTab('cart')">
+        🛒 <span id="cart-count">0</span>
+      </div>
+    </header>
+
+    <!-- Pages -->
+    <main id="main">
+      <!-- Catalog Page -->
+      <section id="page-catalog" class="page active">
+        <div id="categories" class="categories-bar"></div>
+        <div id="products-grid" class="products-grid"></div>
+      </section>
+
+      <!-- Cart Page -->
+      <section id="page-cart" class="page">
+        <div id="cart-items" class="cart-items"></div>
+        <div id="cart-promos" class="cart-promos"></div>
+        <div id="cart-total" class="cart-total"></div>
+        <div class="cart-actions">
+          <button id="btn-sell" class="btn btn-primary btn-large" onclick="completeSale()">💰 Продать</button>
+          <button id="btn-clear-cart" class="btn btn-secondary" onclick="clearCart()">Очистить</button>
+        </div>
+      </section>
+
+      <!-- Logs Page -->
+      <section id="page-logs" class="page">
+        <div class="logs-filters">
+          <button class="filter-btn active" data-filter="all" onclick="filterLogs('all')">Все</button>
+          <button class="filter-btn" data-filter="sale" onclick="filterLogs('sale')">Продажи</button>
+          <button class="filter-btn" data-filter="return" onclick="filterLogs('return')">Возвраты</button>
+          <button class="filter-btn" data-filter="stock" onclick="filterLogs('stock')">Склад</button>
+        </div>
+        <div id="logs-list" class="logs-list"></div>
+      </section>
+
+      <!-- Stats Page -->
+      <section id="page-stats" class="page">
+        <div class="stats-period">
+          <button class="filter-btn active" data-period="today" onclick="setStatsPeriod('today')">Сегодня</button>
+          <button class="filter-btn" data-period="week" onclick="setStatsPeriod('week')">Неделя</button>
+          <button class="filter-btn" data-period="all" onclick="setStatsPeriod('all')">Всё время</button>
+        </div>
+        <div id="stats-content" class="stats-content"></div>
+      </section>
+
+      <!-- Stock Page -->
+      <section id="page-stock" class="page">
+        <div id="stock-categories" class="categories-bar"></div>
+        <div id="stock-list" class="stock-list"></div>
+      </section>
+    </main>
+
+    <!-- Tab Bar -->
+    <nav id="tab-bar">
+      <button class="tab active" data-tab="catalog" onclick="switchTab('catalog')">
+        <span class="tab-icon">🏪</span>
+        <span class="tab-label">Каталог</span>
+      </button>
+      <button class="tab" data-tab="cart" onclick="switchTab('cart')">
+        <span class="tab-icon">🛒</span>
+        <span class="tab-label">Корзина</span>
+      </button>
+      <button class="tab" data-tab="stock" onclick="switchTab('stock')">
+        <span class="tab-icon">📦</span>
+        <span class="tab-label">Склад</span>
+      </button>
+      <button class="tab" data-tab="logs" onclick="switchTab('logs')">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">Логи</span>
+      </button>
+      <button class="tab" data-tab="stats" onclick="switchTab('stats')">
+        <span class="tab-icon">📊</span>
+        <span class="tab-label">Стат.</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+<script src="data.js"></script>
+  <script src="storage.js"></script>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
