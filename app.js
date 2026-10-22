@@ -459,10 +459,23 @@ function updateCartBadge() {
 // =============================================
 // Склад
 // =============================================
+function renderStockCategories() {
+  const container = document.getElementById('stock-categories');
+  if (!container) return;
+  
+  let html = `<button class="cat-btn ${currentCategory === 'all' ? 'active' : ''}" onclick="filterCategory('all')">Все</button>`;
+
+  CATEGORIES.forEach(cat => {
+    html += `<button class="cat-btn ${currentCategory === cat.id ? 'active' : ''}" onclick="filterCategory('${cat.id}')">${cat.icon} ${cat.name}</button>`;
+  });
+
+  container.innerHTML = html;
+}
+
 function renderStock() {
   const stock = DB.getStock();
   const container = document.getElementById('stock-list');
-  
+
   renderStockCategories();
   
   let products = PRODUCTS;

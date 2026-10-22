@@ -122,5 +122,3 @@ const DB = {
     localStorage.setItem(this.KEYS.SALES, JSON.stringify(sales));
   }
 };
-
-</arg_value>

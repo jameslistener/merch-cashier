@@ -3,14 +3,14 @@
 // =============================================
 
 const CATEGORIES = [
-  { id: 'postcards',     name: 'Открытки',         icon: '💌' },
-  { id: 'keychain',      name: 'Брелоки',          icon: '🔑' },
+  { id: 'stickers',      name: 'Одиночные стикеры',icon: '🏷️' },
+  { id: 'stickerpacks',  name: 'Стикерпаки',       icon: '📦' },
   { id: 'badges',        name: 'Значки',           icon: '🏅' },
+  { id: 'swapcards',     name: 'Своп-карты',       icon: '🃏' },
+  { id: 'postcards',     name: 'Открытки',         icon: '💌' },
   { id: 'posters',       name: 'Плакаты',          icon: '🖼️' },
-  { id: 'stickers',      name: 'Наклейки',         icon: '🏷️' },
-  { id: 'stickerpacks',  name: 'Наборы наклеек',   icon: '📦' },
-  { id: 'swapcards',     name: 'Обменные карточки', icon: '🃏' },
-  { id: 'free_stuff',    name: 'Бесплатное',        icon: '🎁' }
+  { id: 'keychain',      name: 'Брелоки',          icon: '🔑' },
+  { id: 'free_stuff',    name: 'Подарочное',       icon: '🎁' }
 ];
 
 const PRODUCTS = [
@@ -20,8 +20,8 @@ const PRODUCTS = [
   { id: 3,  name: 'Открытка «Stocking»',      price: 200, categoryId: 'postcards',    image: 'products/postcards/stocking.png' },
   { id: 4,  name: 'Открытка «Panty»',         price: 200, categoryId: 'postcards',    image: 'products/postcards/panty.png' },
   { id: 5,  name: 'Открытка «Bocci Gorilla»', price: 200, categoryId: 'postcards',    image: 'products/postcards/bocci_gorilla.png' },
-  { id: 6,  name: 'Открытка «Miku Hmo»',      price: 200, categoryId: 'postcards',    image: 'products/postcards/miku_hmo.png' },
-  { id: 7,  name: 'Открытка «Miku Ufo»',      price: 200, categoryId: 'postcards',    image: 'products/postcards/miku_ufo.png' },
+  { id: 6,  name: 'Открытка «Miku HMO»',      price: 200, categoryId: 'postcards',    image: 'products/postcards/miku_hmo.png' },
+  { id: 7,  name: 'Открытка «Miku UFO»',      price: 200, categoryId: 'postcards',    image: 'products/postcards/miku_ufo.png' },
 
   // --- Брелоки (keychain) ---
   { id: 8,  name: 'Брелок «Yotsuba»',         price: 300, categoryId: 'keychain',     image: 'products/keychain/yotsuba.png' },
@@ -46,7 +46,7 @@ const PRODUCTS = [
   { id: 21, name: 'Наклейка «Panty»',         price: 150, categoryId: 'stickers',     image: 'products/stickers/panty.png' },
 
   // --- Наборы наклеек (stickerpacks) ---
-  { id: 22, name: 'Набор «Miku Hmo Ufo»',     price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/miku_hmo_ufo.png' },
+  { id: 22, name: 'Набор «Miku HMO & UFO»',   price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/miku_hmo_ufo.png' },
   { id: 23, name: 'Набор «Bocci»',            price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/bocci.png' },
   { id: 24, name: 'Набор «Sonico»',           price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/sonico.png' },
   { id: 25, name: 'Набор «Miku Calne Ca»',    price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/miku_calne_ca.png' },
@@ -54,18 +54,18 @@ const PRODUCTS = [
   { id: 27, name: 'Набор «Pokemon»',          price: 400, categoryId: 'stickerpacks', image: 'products/stickerpacks/pokemon.png' },
 
   // --- Обменные карточки (swapcards) ---
-  { id: 28, name: 'Карточка «Hippie»',        price: 200, categoryId: 'swapcards',    image: 'products/swapcards/hippie.png' },
-  { id: 29, name: 'Карточка «Emo»',           price: 200, categoryId: 'swapcards',    image: 'products/swapcards/emo.png' },
-  { id: 30, name: 'Карточка «Rap»',           price: 200, categoryId: 'swapcards',    image: 'products/swapcards/rap.png' },
-  { id: 31, name: 'Карточка «Punk»',          price: 200, categoryId: 'swapcards',    image: 'products/swapcards/punk.png' },
-  { id: 32, name: 'Карточка «Goth»',          price: 200, categoryId: 'swapcards',    image: 'products/swapcards/goth.png' },
+  { id: 28, name: 'Своп-карта «Hippie»',      price: 200, categoryId: 'swapcards',    image: 'products/swapcards/hippie.png' },
+  { id: 29, name: 'Своп-карта «Emo»',         price: 200, categoryId: 'swapcards',    image: 'products/swapcards/emo.png' },
+  { id: 30, name: 'Своп-карта «Rap»',         price: 200, categoryId: 'swapcards',    image: 'products/swapcards/rap.png' },
+  { id: 31, name: 'Своп-карта «Punk»',        price: 200, categoryId: 'swapcards',    image: 'products/swapcards/punk.png' },
+  { id: 32, name: 'Своп-карта «Goth»',        price: 200, categoryId: 'swapcards',    image: 'products/swapcards/goth.png' },
 
   // --- Бесплатное (free_stuff) ---
-  { id: 33, name: 'Hippie',                   price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/hippie.png' },
-  { id: 34, name: 'Emo',                      price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/emo.png' },
-  { id: 35, name: 'Rap',                      price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/rap.png' },
-  { id: 36, name: 'Punk',                     price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/punk.png' },
-  { id: 37, name: 'Goth',                     price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/goth.png' }
+  { id: 33, name: 'Подарок Hippie',           price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/hippie.png' },
+  { id: 34, name: 'Подарок Emo',              price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/emo.png' },
+  { id: 35, name: 'Подарок Rap',              price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/rap.png' },
+  { id: 36, name: 'Подарок Punk',             price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/punk.png' },
+  { id: 37, name: 'Подарок Goth',             price: 0,   categoryId: 'free_stuff',   image: 'products/free_stuff/goth.png' }
 ];
 
 // =============================================
