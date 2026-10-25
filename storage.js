@@ -79,6 +79,15 @@ const DB = {
     localStorage.setItem(this.KEYS.CART, JSON.stringify({}));
   },
 
+  clearStock() {
+    localStorage.setItem(this.KEYS.STOCK, JSON.stringify({}));
+  },
+
+  clearLogs() {
+    localStorage.setItem(this.KEYS.LOGS, JSON.stringify([]));
+    localStorage.setItem(this.KEYS.SALES, JSON.stringify([]));
+  },
+
   // --- Логи ---
   getLogs() {
     return JSON.parse(localStorage.getItem(this.KEYS.LOGS) || '[]');

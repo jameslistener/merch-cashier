@@ -4,7 +4,6 @@
 
 let currentCategory = 'all';
 let currentLogFilter = 'all';
-let currentStatsPeriod = 'today';
 
 // =============================================
 // Инициализация
@@ -17,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLogs();
   renderStats();
   updateCartBadge();
+  renderMiniCart();
 });
 
 // =============================================
@@ -47,6 +47,7 @@ function switchTab(tab) {
   if (tab === 'stock') renderStock();
   if (tab === 'logs') renderLogs();
   if (tab === 'stats') renderStats();
+  if (tab === 'catalog') renderMiniCart();
 }
 
 // =============================================
@@ -84,6 +85,7 @@ function productImg(product, className = 'product-img') {
 function renderProducts() {
   const container = document.getElementById('products-grid');
   const stock = DB.getStock();
+  const cart = DB.getCart();
 
   let products = PRODUCTS;
   if (currentCategory !== 'all') {
@@ -97,23 +99,57 @@ function renderProducts() {
 
   let html = '';
   products.forEach(product => {
-    const qty = stock[product.id] || 0;
-    const outOfStock = qty === 0;
+    const stockQty = stock[product.id] || 0;
+    const cartQty = cart[product.id] || 0;
+    const outOfStock = stockQty === 0;
     const priceText = product.price === 0 ? 'Бесплатно' : formatPrice(product.price);
 
     html += `
-      <div class="product-card ${outOfStock ? 'out-of-stock' : ''}" onclick="showProductDetail(${product.id})">
-        ${productImg(product)}
+      <div class="product-card ${outOfStock ? 'out-of-stock' : ''}">
+        <div class="product-img-wrapper" onclick="addToCartFromCatalog(${product.id})">
+          ${productImg(product)}
+        </div>
         <div class="product-info">
           <div class="product-name">${product.name}</div>
           <div class="product-price">${priceText}</div>
-          <div class="product-stock">${outOfStock ? 'Нет в наличии' : `В наличии: ${qty}`}</div>
+          <div class="product-stock">${outOfStock ? 'Нет в наличии' : `В наличии: ${stockQty}`}</div>
+          ${cartQty > 0 ? `
+            <div class="product-cart-controls">
+              <button class="qty-btn-sm minus" onclick="removeFromCartCatalog(${product.id})">−</button>
+              <span class="qty-display">${cartQty}</span>
+              <button class="qty-btn-sm plus" onclick="addToCartFromCatalog(${product.id})">+</button>
+            </div>
+          ` : ''}
         </div>
       </div>
     `;
   });
 
   container.innerHTML = html;
+}
+
+function addToCartFromCatalog(productId) {
+  const stock = DB.getStock();
+  const cart = DB.getCart();
+  const stockQty = stock[productId] || 0;
+  const cartQty = cart[productId] || 0;
+
+  if (cartQty >= stockQty) {
+    showToast('Нет в наличии', 'error');
+    return;
+  }
+
+  DB.addToCart(productId, 1);
+  updateCartBadge();
+  renderProducts();
+  renderMiniCart();
+}
+
+function removeFromCartCatalog(productId) {
+  DB.removeFromCart(productId, 1);
+  updateCartBadge();
+  renderProducts();
+  renderMiniCart();
 }
 
 // =============================================
@@ -149,14 +185,15 @@ function showProductDetail(productId) {
 function addToCartFromModal(productId) {
   const stock = DB.getStock();
   const qty = stock[productId] || 0;
-  
+
   if (qty === 0) {
     showToast('Нет в наличии', 'error');
     return;
   }
-  
+
   DB.addToCart(productId, 1);
   updateCartBadge();
+  renderMiniCart();
   closeModal();
   showToast('Добавлено в корзину', 'success');
 }
@@ -263,7 +300,8 @@ function renderCart() {
   // Рендер промо
   let promosHtml = '';
   discounts.forEach(d => {
-    promosHtml += `<div class="promo-line discount">🎁 ${d.name}: −${formatPrice(d.amount)}</div>`;
+    const countText = d.count > 1 ? ` (×${d.count})` : '';
+    promosHtml += `<div class="promo-line discount">🎁 ${d.name}${countText}: −${formatPrice(d.amount)}</div>`;
   });
   gifts.forEach(g => {
     promosHtml += `<div class="promo-line gift">🎁 ${g.name}: ${g.productName} в подарок</div>`;
@@ -303,39 +341,34 @@ function calculateCartTotals(cartItems) {
   cartItems.forEach(({ product, qty }) => {
     subtotal += product.price * qty;
   });
-  
+
   const discounts = [];
   const gifts = [];
-  
-  // Проверяем акции
+
+  // Проверяем акции типа product_set
   PROMOTIONS.forEach(promo => {
-    if (promo.type === 'combo_discount') {
-      const hasAll = promo.requiredProductIds.every(id => 
-        cartItems.some(item => item.product.id === id)
-      );
-      if (hasAll) {
+    if (promo.type === 'product_set') {
+      // Находим минимальное количество среди товаров набора
+      const quantities = promo.requiredProductIds.map(id => {
+        const item = cartItems.find(item => item.product.id === id);
+        return item ? item.qty : 0;
+      });
+      
+      const setCount = Math.min(...quantities);
+      
+      if (setCount > 0) {
         discounts.push({
           name: promo.name,
-          amount: promo.discount
+          amount: promo.discount * setCount,
+          count: setCount
         });
-      }
-    } else if (promo.type === 'gift_by_total') {
-      if (subtotal > promo.threshold) {
-        const giftProduct = PRODUCTS.find(p => p.id === promo.giftProductId);
-        if (giftProduct) {
-          gifts.push({
-            name: promo.name,
-            productId: giftProduct.id,
-            productName: giftProduct.name
-          });
-        }
       }
     }
   });
-  
+
   const totalDiscount = discounts.reduce((sum, d) => sum + d.amount, 0);
   const total = Math.max(0, subtotal - totalDiscount);
-  
+
   return { subtotal, discounts, gifts, total };
 }
 
@@ -344,28 +377,134 @@ function addToCart(productId) {
   const cart = DB.getCart();
   const currentQty = cart[productId] || 0;
   const availableQty = stock[productId] || 0;
-  
+
   if (currentQty >= availableQty) {
     showToast('Нет в наличии', 'error');
     return;
   }
-  
+
   DB.addToCart(productId, 1);
   updateCartBadge();
   renderCart();
+  renderMiniCart();
 }
 
 function removeFromCart(productId) {
   DB.removeFromCart(productId, 1);
   updateCartBadge();
   renderCart();
+  renderMiniCart();
+}
+
+function confirmClearCart() {
+  const content = `
+    <h2>Очистить корзину?</h2>
+    <p style="color: var(--text-dim); margin-bottom: 20px;">Все товары будут удалены из корзины</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="clearCart(); closeModal();">Очистить</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+    </div>
+  `;
+  openModal(content);
 }
 
 function clearCart() {
   DB.clearCart();
   updateCartBadge();
   renderCart();
+  renderMiniCart();
   showToast('Корзина очищена');
+}
+
+function confirmClearStock() {
+  const content = `
+    <h2>Очистить склад?</h2>
+    <p style="color: var(--text-dim); margin-bottom: 20px;">Все остатки товаров будут обнулены</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="clearStock(); closeModal();">Очистить</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+    </div>
+  `;
+  openModal(content);
+}
+
+function clearStock() {
+  DB.clearStock();
+  renderStock();
+  renderCatalog();
+  showToast('Склад очищен');
+}
+
+function confirmClearLogs() {
+  const content = `
+    <h2>Очистить логи?</h2>
+    <p style="color: var(--text-dim); margin-bottom: 20px;">Все логи продаж, возвратов и склада будут удалены</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="clearLogs(); closeModal();">Очистить</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+    </div>
+  `;
+  openModal(content);
+}
+
+function clearLogs() {
+  DB.clearLogs();
+  renderLogs();
+  renderStats();
+  showToast('Логи очищены');
+}
+
+function confirmSale() {
+  const cart = DB.getCart();
+  const cartItems = Object.entries(cart).map(([productId, qty]) => {
+    const product = PRODUCTS.find(p => p.id === parseInt(productId));
+    return { product, qty };
+  }).filter(item => item.product);
+
+  if (cartItems.length === 0) {
+    showToast('Корзина пуста', 'error');
+    return;
+  }
+
+  const { subtotal, discounts, gifts, total } = calculateCartTotals(cartItems);
+  
+  let itemsList = cartItems.map(({ product, qty }) => 
+    `<div style="display: flex; justify-content: space-between; padding: 4px 0;">
+      <span>${product.name} × ${qty}</span>
+      <span>${formatPrice(product.price * qty)}</span>
+    </div>`
+  ).join('');
+
+  if (discounts.length > 0) {
+    itemsList += `<div style="display: flex; justify-content: space-between; padding: 4px 0; color: var(--success);">
+      <span>Скидки</span>
+      <span>−${formatPrice(discounts.reduce((sum, d) => sum + d.amount, 0))}</span>
+    </div>`;
+  }
+
+  if (gifts.length > 0) {
+    itemsList += `<div style="display: flex; justify-content: space-between; padding: 4px 0; color: var(--warning);">
+      <span>Подарки</span>
+      <span>${gifts.map(g => g.productName).join(', ')}</span>
+    </div>`;
+  }
+
+  itemsList += `<div style="display: flex; justify-content: space-between; padding: 8px 0; margin-top: 8px; border-top: 2px solid var(--surface3); font-size: 18px; font-weight: 700;">
+    <span>Итого</span>
+    <span style="color: var(--success);">${formatPrice(total)}</span>
+  </div>`;
+
+  const content = `
+    <h2>Подтвердить продажу?</h2>
+    <div style="margin-bottom: 20px; max-height: 300px; overflow-y: auto;">
+      ${itemsList}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="completeSale(); closeModal();">Продать</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+    </div>
+  `;
+  openModal(content);
 }
 
 function completeSale() {
@@ -419,12 +558,13 @@ function completeSale() {
     gifts: gifts,
     total: total
   };
-  
-  DB.addSale(sale);
-  
+
+  const savedSale = DB.addSale(sale);
+
   // Логируем
   DB.addLog({
     type: 'sale',
+    saleId: savedSale.id,
     items: sale.items,
     subtotal: sale.subtotal,
     discounts: sale.discounts,
@@ -436,9 +576,10 @@ function completeSale() {
   DB.clearCart();
   updateCartBadge();
   renderCart();
+  renderMiniCart();
   renderCatalog();
   renderStock();
-  
+
   showToast(`Продажа: ${formatPrice(total)}`, 'success');
 }
 
@@ -447,13 +588,66 @@ function updateCartBadge() {
   const count = Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   const badge = document.getElementById('cart-badge');
   const countEl = document.getElementById('cart-count');
-  
+
+  if (!badge || !countEl) return;
+
   if (count > 0) {
     badge.classList.remove('hidden');
     countEl.textContent = count;
   } else {
     badge.classList.add('hidden');
   }
+}
+
+function renderMiniCart() {
+  const container = document.getElementById('mini-cart-items');
+  const totalContainer = document.getElementById('mini-cart-total');
+  if (!container || !totalContainer) return;
+
+  const cart = DB.getCart();
+  const cartItems = Object.entries(cart).map(([productId, qty]) => {
+    const product = PRODUCTS.find(p => p.id === parseInt(productId));
+    return { product, qty };
+  }).filter(item => item.product);
+
+  if (cartItems.length === 0) {
+    container.innerHTML = '<div class="mini-cart-empty">Пусто</div>';
+    totalContainer.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  cartItems.forEach(({ product, qty }) => {
+    const itemTotal = product.price * qty;
+    html += `
+      <div class="mini-cart-item">
+        <span class="mini-cart-item-name">${product.name}</span>
+        <span class="mini-cart-item-qty">×${qty}</span>
+        <span class="mini-cart-item-price">${formatPrice(itemTotal)}</span>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+
+  // Рассчитываем итоги с учетом скидок
+  const { total, discounts } = calculateCartTotals(cartItems);
+  const totalDiscount = discounts.reduce((sum, d) => sum + d.amount, 0);
+
+  let totalHtml = `
+    <span class="label">Итого</span>
+    <span class="value">${formatPrice(total)}</span>
+  `;
+
+  if (totalDiscount > 0) {
+    totalHtml = `
+      <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 4px;">
+        Скидка: −${formatPrice(totalDiscount)}
+      </div>
+      ${totalHtml}
+    `;
+  }
+
+  totalContainer.innerHTML = totalHtml;
 }
 
 // =============================================
@@ -509,6 +703,7 @@ function renderStock() {
         <div class="stock-actions">
           <button class="stock-btn remove" onclick="updateStock(${product.id}, -1)" ${qty === 0 ? 'disabled' : ''}>−</button>
           <button class="stock-btn add" onclick="updateStock(${product.id}, 1)">+</button>
+          <button class="stock-btn add" onclick="updateStock(${product.id}, 10)">+10</button>
           <button class="stock-btn cart-add" onclick="addToCartFromStock(${product.id})" ${qty === 0 ? 'disabled' : ''}>🛒</button>
         </div>
       </div>
@@ -543,14 +738,15 @@ function updateStock(productId, delta) {
 function addToCartFromStock(productId) {
   const stock = DB.getStock();
   const qty = stock[productId] || 0;
-  
+
   if (qty === 0) {
     showToast('Нет в наличии', 'error');
     return;
   }
-  
+
   DB.addToCart(productId, 1);
   updateCartBadge();
+  renderMiniCart();
   showToast('Добавлено в корзину', 'success');
 }
 
@@ -608,7 +804,7 @@ function renderLogs() {
           <span class="log-time">${time}</span>
         </div>
         <div class="log-details">${detailsHtml}</div>
-        ${log.type === 'sale' ? `<button class="btn btn-danger" style="margin-top: 10px; width: 100%; padding: 10px;" onclick="showReturnModal('${log.id}')">↩️ Возврат</button>` : ''}
+        ${log.type === 'sale' && log.saleId ? `<button class="btn btn-danger" style="margin-top: 10px; width: 100%; padding: 10px;" onclick="showReturnModal('${log.saleId}')">↩️ Возврат</button>` : ''}
       </div>
     `;
   });
@@ -653,12 +849,12 @@ function showReturnModal(saleId) {
   
   const content = `
     <h2>↩️ Возврат</h2>
-    <p style="color: var(--text-dim); margin-bottom: 16px;">Выберите товары для возврата</p>
-    ${itemsHtml}
-    <div class="modal-actions">
+    <div class="modal-actions" style="margin-bottom: 16px;">
       <button class="btn btn-danger" onclick="processReturn('${saleId}')">Вернуть</button>
       <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
     </div>
+    <p style="color: var(--text-dim); margin-bottom: 8px;">Выберите товары для возврата</p>
+    ${itemsHtml}
   `;
   
   openModal(content);
@@ -667,44 +863,93 @@ function showReturnModal(saleId) {
 function processReturn(saleId) {
   const sales = DB.getSales();
   const sale = sales.find(s => s.id === saleId);
-  
+
   if (!sale) {
     showToast('Продажа не найдена', 'error');
     return;
   }
-  
+
   const returnItems = [];
-  let returnTotal = 0;
-  
+
   sale.items.forEach((item, idx) => {
     const checkbox = document.getElementById(`return-check-${idx}`);
     if (checkbox && checkbox.checked) {
-      returnItems.push(item);
-      returnTotal += item.price * item.quantity;
-      
+      returnItems.push({ ...item });
       // Возвращаем на склад
       DB.addStock(item.productId, item.quantity);
     }
   });
-  
+
   if (returnItems.length === 0) {
     showToast('Ничего не выбрано', 'error');
     return;
   }
-  
+
+  // Рассчитываем сумму возврата с учетом скидок
+  const returnTotal = calculateReturnTotal(sale, returnItems);
+
   // Логируем возврат
   DB.addLog({
     type: 'return',
     saleId: saleId,
     items: returnItems,
-    total: returnTotal
+    total: returnTotal,
+    discounts: sale.discounts || []
   });
-  
+
   closeModal();
   renderLogs();
   renderCatalog();
   renderStock();
   showToast(`Возврат: ${formatPrice(returnTotal)}`, 'success');
+}
+
+function calculateReturnTotal(sale, returnItems) {
+  // Сумма возвращаемых товаров по обычным ценам
+  const returnSubtotal = returnItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+  if (!sale.discounts || sale.discounts.length === 0) {
+    return returnSubtotal;
+  }
+
+  // Создаем карту оставшихся товаров после возврата
+  const remainingItems = {};
+  sale.items.forEach(item => {
+    remainingItems[item.productId] = item.quantity;
+  });
+  
+  returnItems.forEach(item => {
+    remainingItems[item.productId] -= item.quantity;
+  });
+
+  // Рассчитываем, какие скидки теряются при возврате
+  let lostDiscount = 0;
+
+  PROMOTIONS.forEach(promo => {
+    if (promo.type === 'product_set') {
+      // Находим количество наборов ДО возврата
+      const beforeQuantities = promo.requiredProductIds.map(id => {
+        const item = sale.items.find(i => i.productId === id);
+        return item ? item.quantity : 0;
+      });
+      const setsBefore = Math.min(...beforeQuantities);
+
+      // Находим количество наборов ПОСЛЕ возврата
+      const afterQuantities = promo.requiredProductIds.map(id => {
+        return remainingItems[id] || 0;
+      });
+      const setsAfter = Math.min(...afterQuantities);
+
+      // Потерянные наборы
+      const lostSets = setsBefore - setsAfter;
+      if (lostSets > 0) {
+        lostDiscount += promo.discount * lostSets;
+      }
+    }
+  });
+
+  // Итоговая сумма возврата = сумма товаров - потерянные скидки
+  return Math.max(0, returnSubtotal - lostDiscount);
 }
 
 // =============================================
@@ -714,88 +959,315 @@ function renderStats() {
   const sales = DB.getSales();
   const logs = DB.getLogs();
   const container = document.getElementById('stats-content');
-  
-  // Фильтруем по периоду
-  const now = Date.now();
-  let cutoff = 0;
-  
-  if (currentStatsPeriod === 'today') {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    cutoff = today.getTime();
-  } else if (currentStatsPeriod === 'week') {
-    cutoff = now - 7 * 24 * 60 * 60 * 1000;
+
+  if (sales.length === 0 && logs.filter(l => l.type === 'return').length === 0) {
+    container.innerHTML = '<div class="stats-empty">Нет данных</div>';
+    return;
   }
-  
-  const filteredSales = sales.filter(s => new Date(s.timestamp).getTime() >= cutoff);
-  const returnLogs = logs.filter(l => l.type === 'return' && new Date(l.timestamp).getTime() >= cutoff);
-  
-  // Считаем метрики
-  const totalRevenue = filteredSales.reduce((sum, s) => sum + s.total, 0);
-  const totalSalesCount = filteredSales.length;
-  const totalReturns = returnLogs.reduce((sum, r) => sum + r.total, 0);
-  const returnsCount = returnLogs.length;
-  const avgCheck = totalSalesCount > 0 ? totalRevenue / totalSalesCount : 0;
-  
-  // Топ товаров
-  const itemCounts = {};
-  filteredSales.forEach(sale => {
+
+  // Группируем по дням
+  const daysMap = {};
+
+  sales.forEach(sale => {
+    const date = new Date(sale.timestamp);
+    const dayKey = date.toISOString().split('T')[0];
+
+    if (!daysMap[dayKey]) {
+      daysMap[dayKey] = { sales: 0, returns: 0, salesCount: 0, returnsCount: 0, categories: {}, products: {} };
+    }
+    daysMap[dayKey].sales += sale.total;
+    daysMap[dayKey].salesCount++;
+
+    // Считаем категории для этого дня
     sale.items.forEach(item => {
-      if (!itemCounts[item.productId]) {
-        itemCounts[item.productId] = { name: item.productName, count: 0 };
+      const product = PRODUCTS.find(p => p.id === item.productId);
+      if (!product) return;
+      const catId = product.categoryId;
+      const cat = CATEGORIES.find(c => c.id === catId);
+      const catName = cat ? cat.name : catId;
+
+      if (!daysMap[dayKey].categories[catId]) {
+        daysMap[dayKey].categories[catId] = { name: catName, sold: 0, returned: 0 };
       }
-      itemCounts[item.productId].count += item.quantity;
+      daysMap[dayKey].categories[catId].sold += item.quantity;
+
+      // Считаем по товарам
+      if (!daysMap[dayKey].products[item.productId]) {
+        daysMap[dayKey].products[item.productId] = { name: item.productName, sold: 0, returned: 0 };
+      }
+      daysMap[dayKey].products[item.productId].sold += item.quantity;
     });
   });
-  
-  const topItems = Object.values(itemCounts)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-  
-  let html = `
-    <div class="stat-card">
-      <div class="stat-card-title">Выручка</div>
-      <div class="stat-card-value money">${formatPrice(totalRevenue)}</div>
-      <div class="stat-card-sub">${totalSalesCount} продаж</div>
-    </div>
-    
-    <div class="stat-card">
-      <div class="stat-card-title">Средний чек</div>
-      <div class="stat-card-value count">${formatPrice(avgCheck)}</div>
-    </div>
-    
-    <div class="stat-card">
-      <div class="stat-card-title">Возвраты</div>
-      <div class="stat-card-value returns">${formatPrice(totalReturns)}</div>
-      <div class="stat-card-sub">${returnsCount} возвратов</div>
-    </div>
-  `;
-  
-  if (topItems.length > 0) {
+
+  logs.filter(l => l.type === 'return').forEach(log => {
+    const date = new Date(log.timestamp);
+    const dayKey = date.toISOString().split('T')[0];
+
+    if (!daysMap[dayKey]) {
+      daysMap[dayKey] = { sales: 0, returns: 0, salesCount: 0, returnsCount: 0, categories: {}, products: {} };
+    }
+    daysMap[dayKey].returns += log.total;
+    daysMap[dayKey].returnsCount++;
+
+    // Считаем возвраты по категориям и товарам
+    if (log.items) {
+      log.items.forEach(item => {
+        const product = PRODUCTS.find(p => p.id === item.productId);
+        if (!product) return;
+        const catId = product.categoryId;
+        if (!daysMap[dayKey].categories[catId]) {
+          const cat = CATEGORIES.find(c => c.id === catId);
+          daysMap[dayKey].categories[catId] = { name: cat ? cat.name : catId, sold: 0, returned: 0 };
+        }
+        daysMap[dayKey].categories[catId].returned += item.quantity;
+
+        // Считаем по товарам
+        if (!daysMap[dayKey].products[item.productId]) {
+          daysMap[dayKey].products[item.productId] = { name: item.productName, sold: 0, returned: 0 };
+        }
+        daysMap[dayKey].products[item.productId].returned += item.quantity;
+      });
+    }
+  });
+
+  // Сортируем по дате (новые сверху)
+  const days = Object.entries(daysMap)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, data]) => ({ date, ...data }));
+
+  // Рендер HTML
+  let html = '<div class="stats-actions">';
+  html += '<button class="btn btn-secondary" onclick="exportStats()">📋 Экспорт статистики</button>';
+  html += '</div>';
+
+  html += '<div class="stats-days">';
+
+  days.forEach(day => {
+    const dateStr = formatDateShort(day.date);
+    const net = day.sales - day.returns;
+
+    // Категории компактной строкой
+    const cats = Object.values(day.categories);
+    let categoriesHtml = '';
+    if (cats.length > 0) {
+      const catLines = cats.map(cat => {
+        const netQty = cat.sold - cat.returned;
+        let line = `${cat.name}: продано ${cat.sold}`;
+        if (cat.returned > 0) {
+          line += `, возвращено ${cat.returned}`;
+        }
+        line += `, итого ${netQty}`;
+        return line;
+      });
+      categoriesHtml = `<div class="stat-day-categories">${catLines.join('<br>')}</div>`;
+    }
+
+    // Товары компактной строкой
+    const prods = Object.values(day.products);
+    let productsHtml = '';
+    if (prods.length > 0) {
+      const prodLines = prods.map(prod => {
+        const netQty = prod.sold - prod.returned;
+        let line = `${prod.name}: продано ${prod.sold}`;
+        if (prod.returned > 0) {
+          line += `, возвращено ${prod.returned}`;
+        }
+        line += `, итого ${netQty}`;
+        return line;
+      });
+      productsHtml = `<div class="stat-day-products">${prodLines.join('<br>')}</div>`;
+    }
+
     html += `
-      <div class="stat-top-items">
-        <h3>Топ товаров</h3>
-        ${topItems.map(item => `
-          <div class="stat-top-item">
-            <span class="stat-top-item-name">${item.name}</span>
-            <span class="stat-top-item-count">${item.count} шт.</span>
+      <div class="stat-day-card">
+        <div class="stat-day-date">${dateStr}</div>
+        <div class="stat-day-details">
+          <div class="stat-day-row">
+            <span class="label">Продажи:</span>
+            <span class="value sales">${formatPrice(day.sales)}</span>
+            <span class="count">(${day.salesCount})</span>
           </div>
-        `).join('')}
+          ${day.returns > 0 ? `
+            <div class="stat-day-row">
+              <span class="label">Возвраты:</span>
+              <span class="value returns">−${formatPrice(day.returns)}</span>
+              <span class="count">(${day.returnsCount})</span>
+            </div>
+          ` : ''}
+          <div class="stat-day-row total">
+            <span class="label">Итого:</span>
+            <span class="value ${net >= 0 ? 'sales' : 'returns'}">${formatPrice(net)}</span>
+          </div>
+          ${categoriesHtml}
+          ${productsHtml}
+        </div>
       </div>
     `;
-  }
-  
+  });
+
+  html += '</div>';
+
   container.innerHTML = html;
 }
 
-function setStatsPeriod(period) {
-  currentStatsPeriod = period;
-  
-  document.querySelectorAll('.stats-period .filter-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.period === period);
+function exportStats() {
+  const sales = DB.getSales();
+  const logs = DB.getLogs();
+
+  if (sales.length === 0 && logs.filter(l => l.type === 'return').length === 0) {
+    showToast('Нет данных для экспорта', 'error');
+    return;
+  }
+
+  // Группируем по дням
+  const daysMap = {};
+
+  sales.forEach(sale => {
+    const date = new Date(sale.timestamp);
+    const dayKey = date.toISOString().split('T')[0];
+
+    if (!daysMap[dayKey]) {
+      daysMap[dayKey] = { date: dayKey, sales: 0, returns: 0, salesCount: 0, returnsCount: 0, categories: {}, products: {} };
+    }
+    daysMap[dayKey].sales += sale.total;
+    daysMap[dayKey].salesCount++;
+
+    sale.items.forEach(item => {
+      const product = PRODUCTS.find(p => p.id === item.productId);
+      if (!product) return;
+      const catId = product.categoryId;
+      const cat = CATEGORIES.find(c => c.id === catId);
+      const catName = cat ? cat.name : catId;
+
+      if (!daysMap[dayKey].categories[catId]) {
+        daysMap[dayKey].categories[catId] = { name: catName, sold: 0, returned: 0 };
+      }
+      daysMap[dayKey].categories[catId].sold += item.quantity;
+
+      // Считаем по товарам
+      if (!daysMap[dayKey].products[item.productId]) {
+        daysMap[dayKey].products[item.productId] = { name: item.productName, sold: 0, returned: 0 };
+      }
+      daysMap[dayKey].products[item.productId].sold += item.quantity;
+    });
   });
-  
-  renderStats();
+
+  logs.filter(l => l.type === 'return').forEach(log => {
+    const date = new Date(log.timestamp);
+    const dayKey = date.toISOString().split('T')[0];
+
+    if (!daysMap[dayKey]) {
+      daysMap[dayKey] = { date: dayKey, sales: 0, returns: 0, salesCount: 0, returnsCount: 0, categories: {}, products: {} };
+    }
+    daysMap[dayKey].returns += log.total;
+    daysMap[dayKey].returnsCount++;
+
+    if (log.items) {
+      log.items.forEach(item => {
+        const product = PRODUCTS.find(p => p.id === item.productId);
+        if (!product) return;
+        const catId = product.categoryId;
+        if (!daysMap[dayKey].categories[catId]) {
+          const cat = CATEGORIES.find(c => c.id === catId);
+          daysMap[dayKey].categories[catId] = { name: cat ? cat.name : catId, sold: 0, returned: 0 };
+        }
+        daysMap[dayKey].categories[catId].returned += item.quantity;
+
+        // Считаем по товарам
+        if (!daysMap[dayKey].products[item.productId]) {
+          daysMap[dayKey].products[item.productId] = { name: item.productName, sold: 0, returned: 0 };
+        }
+        daysMap[dayKey].products[item.productId].returned += item.quantity;
+      });
+    }
+  });
+
+  // Преобразуем в массив и добавляем итоги по категориям и товарам
+  const days = Object.values(daysMap)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map(day => {
+      const categories = Object.values(day.categories).map(cat => ({
+        name: cat.name,
+        sold: cat.sold,
+        returned: cat.returned,
+        net: cat.sold - cat.returned
+      }));
+      const products = Object.values(day.products).map(prod => ({
+        name: prod.name,
+        sold: prod.sold,
+        returned: prod.returned,
+        net: prod.sold - prod.returned
+      }));
+      return {
+        date: day.date,
+        sales: day.sales,
+        returns: day.returns,
+        net: day.sales - day.returns,
+        salesCount: day.salesCount,
+        returnsCount: day.returnsCount,
+        categories,
+        products
+      };
+    });
+
+  const json = JSON.stringify(days, null, 2);
+
+  // Показываем в модалке с кнопкой копирования
+  const content = `
+    <h2>📋 Экспорт статистики</h2>
+    <div class="modal-actions" style="margin-bottom: 12px;">
+      <button class="btn btn-primary" onclick="copyStatsToClipboard()">📋 Скопировать</button>
+      <button class="btn btn-secondary" onclick="downloadStats()">💾 Скачать</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Закрыть</button>
+    </div>
+    <textarea id="stats-json" readonly style="
+      width: 100%;
+      height: 400px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--surface3);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: vertical;
+    ">${json}</textarea>
+  `;
+
+  openModal(content);
+}
+
+function copyStatsToClipboard() {
+  const textarea = document.getElementById('stats-json');
+  textarea.select();
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    showToast('Скопировано в буфер', 'success');
+  }).catch(() => {
+    // Fallback для старых браузеров
+    document.execCommand('copy');
+    showToast('Скопировано', 'success');
+  });
+}
+
+function downloadStats() {
+  const textarea = document.getElementById('stats-json');
+  const blob = new Blob([textarea.value], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stats-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Файл скачан', 'success');
+}
+
+function formatDateShort(dateStr) {
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}.${month}`;
 }
 
 // =============================================
